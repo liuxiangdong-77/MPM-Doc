@@ -1,0 +1,142 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug MPM (No Build)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build_debug/mpm",
+            "args": [
+                "-f", "~/mpm/demo/",
+                "-p", "16",
+                "-i", "mpm.json"
+            ],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}/build_debug",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "跳过OpenMP和STL内部函数",
+                    "text": "skip -gfi /usr/include/c++/*/parallel/*\nskip -gfi /usr/include/c++/*/ext/*\nskip -gfi /usr/lib*/libgomp*.so.*",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "允许未解析的断点",
+                    "text": "set breakpoint pending on",
+                    "ignoreFailures": true
+                }
+            ],
+            "sourceFileMap": {
+                "/build/glibc-*": "${workspaceFolder}"  // 映射glibc源码路径
+            },
+            "miDebuggerPath": "/usr/bin/gdb",
+            "logging": {  // 新增：开启日志查看问题
+                "engineLogging": true,
+                "trace": true,
+                "traceResponse": true
+            }
+        },
+        {
+            "name": "Debug_mpmtest_small",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/mpmtest_small",
+            "args": [
+                "-f", "~/mpm-simulations/demo/",
+                "-p", "16",
+                "-i", "mpmtest_small.json"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "name": "Debug_mpmtest_unit",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/mpmtest_unit",
+            "args": [
+                "-f", "~/mpm-simulations/demo/",
+                "-p", "16",
+                "-i", "mpmtest_unit.json"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "name": "Run MPM with Parameters",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/mpm",
+            "args": [
+                "-f", 
+                "${input:simulationFolder}",
+                "-p",
+                "${input:processCount}",
+                "-i",
+                "${input:configFile}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "simulationFolder",
+            "type": "promptString",
+            "description": "Simulation folder path",
+            "default": "~/mpm-simulations/demo/"
+        },
+        {
+            "id": "processCount",
+            "type": "promptString",
+            "description": "Number of processes",
+            "default": "16"
+        },
+        {
+            "id": "configFile",
+            "type": "promptString",
+            "description": "Configuration file name",
+            "default": "mpm.json"
+        }
+    ]
+}
