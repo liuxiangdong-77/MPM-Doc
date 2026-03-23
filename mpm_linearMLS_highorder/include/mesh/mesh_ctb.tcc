@@ -429,6 +429,8 @@ Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::interpolate_particle_mtf_velo_at
 
   // 4. 直接收集粒子的mtf_velocity + 新增收集粒子坐标（MLS插值需要）
   const double support_radius = 1.5 * this->compute_average_cell_size();//可改
+
+
   const double epsilon = 1.E-15;
   // 【修改1】新增：存储有效粒子坐标（MLS插值需要粒子坐标来构建基函数）
   std::vector<VectorDim> valid_particle_coords;
@@ -498,57 +500,47 @@ Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::interpolate_particle_mtf_velo_at
   //return nearest_accel;
 }
 
-// 1D MLS
-template <unsigned Tdim>
-Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::mls_interpolate_velo_at_point(
-    const VectorDim& point_coord,  // 外推点坐标（插值目标点）
-    const std::vector<VectorDim>& valid_particle_coords,  // 搜索域内有效粒子坐标
-    const std::vector<VectorDim>& valid_particle_velos,  // 搜索域内有效粒子加速度
-    const std::vector<double>& valid_particle_weights) {  // 搜索域内有效粒子的MLS权重
-
-  // 初始化插值结果（外推点的加速度）
-  VectorDim interpolated_velo = VectorDim::Zero();
-
-  try {
-    // ==================== 常数基函数核心：仅含常数项[1]，无需矩阵运算 ====================
-    const unsigned basis_size = 1;  // 论文定义：常数基函数维度=1（仅[1]）
-    double total_weight = 0.0;       // 权重总和（替代矩矩阵，避免求逆）
-
-    // ==================== 仅需计算“权重×加速度”的累加和 ====================
-    for (size_t i = 0; i < valid_particle_weights.size(); ++i) {
-      double weight = valid_particle_weights[i];
-      VectorDim particle_velo = valid_particle_velos[i];
-
-      // 1. 累加权重（常数基函数的矩矩阵为1×1的标量，即权重总和）
-      total_weight += weight;
-
-      // 2. 累加“权重×粒子加速度”（对应论文中b(x)的计算）
-      //interpolated_displacement += weight * particle_displacement;
-      interpolated_velo += weight * particle_velo;
-    }
-
-    // ==================== 重构外推点加速度：加权平均（论文§3.1常数基函数逻辑） ====================
-    const double epsilon = 1e-15;
-    if (total_weight < epsilon) {
-      ctb_console_->warn("Total weight of constant basis is zero, return zero velocity");
-      //return interpolated_displacement;
-      return interpolated_velo;
-    }
-
-    // 常数基函数插值结果 = （权重×加速度总和） / 权重总和（本质是加权平均）
-    interpolated_velo /= total_weight;
-
-    // 调试信息：输出关键参数，验证常数基函数生效
-    ctb_console_->debug("Constant basis MLS: Total weight={:.4e}, Interpolated velocity=[{:.4e}, {:.4e}]",
-                    total_weight, interpolated_velo(0), interpolated_velo(1));
-
-  } catch (std::exception& exception) {
-    ctb_console_->error("Constant basis MLS interpolate failed: {}", exception.what());
-  }
-
-  //return interpolated_displacement;
-  return interpolated_velo;
-}
+// // 1D MLS
+// template <unsigned Tdim>
+// Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::mls_interpolate_velo_at_point(
+//     const VectorDim& point_coord,  // 外推点坐标（插值目标点）
+//     const std::vector<VectorDim>& valid_particle_coords,  // 搜索域内有效粒子坐标
+//     const std::vector<VectorDim>& valid_particle_velos,  // 搜索域内有效粒子加速度
+//     const std::vector<double>& valid_particle_weights) {  // 搜索域内有效粒子的MLS权重
+//   // 初始化插值结果（外推点的加速度）
+//   VectorDim interpolated_velo = VectorDim::Zero();
+//   try {
+//     // ==================== 常数基函数核心：仅含常数项[1]，无需矩阵运算 ====================
+//     const unsigned basis_size = 1;  // 论文定义：常数基函数维度=1（仅[1]）
+//     double total_weight = 0.0;       // 权重总和（替代矩矩阵，避免求逆）
+//     // ==================== 仅需计算“权重×加速度”的累加和 ====================
+//     for (size_t i = 0; i < valid_particle_weights.size(); ++i) {
+//       double weight = valid_particle_weights[i];
+//       VectorDim particle_velo = valid_particle_velos[i];
+//       // 1. 累加权重（常数基函数的矩矩阵为1×1的标量，即权重总和）
+//       total_weight += weight;
+//       // 2. 累加“权重×粒子加速度”（对应论文中b(x)的计算）
+//       //interpolated_displacement += weight * particle_displacement;
+//       interpolated_velo += weight * particle_velo;
+//     }
+//     // ==================== 重构外推点加速度：加权平均（论文§3.1常数基函数逻辑） ====================
+//     const double epsilon = 1e-15;
+//     if (total_weight < epsilon) {
+//       ctb_console_->warn("Total weight of constant basis is zero, return zero velocity");
+//       //return interpolated_displacement;
+//       return interpolated_velo;
+//     }
+//     // 常数基函数插值结果 = （权重×加速度总和） / 权重总和（本质是加权平均）
+//     interpolated_velo /= total_weight;
+//     // 调试信息：输出关键参数，验证常数基函数生效
+//     ctb_console_->debug("Constant basis MLS: Total weight={:.4e}, Interpolated velocity=[{:.4e}, {:.4e}]",
+//                     total_weight, interpolated_velo(0), interpolated_velo(1))
+//   } catch (std::exception& exception) {
+//     ctb_console_->error("Constant basis MLS interpolate failed: {}", exception.what());
+//   }
+//   //return interpolated_displacement;
+//   return interpolated_velo;
+// }
 
 
 // // MLS核心算法
@@ -615,65 +607,70 @@ Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::mls_interpolate_velo_at_point(
 // }
 
 
-// // MLS-2D QR
-// template <unsigned Tdim>
-// Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::mls_interpolate_velo_at_point(
-//     const VectorDim& point_coord,  
-//     const std::vector<VectorDim>& valid_particle_coords,  
-//     const std::vector<VectorDim>& valid_particle_velos,  
-//     const std::vector<double>& valid_particle_weights) {  
-//   VectorDim interpolated_velo = VectorDim::Zero();
-//   try {
-//     const unsigned basis_size = Tdim + 1;  // 2D=3，3D=4，逻辑不变
-//     Eigen::Matrix<double, basis_size, basis_size> moment_matrix = Eigen::Matrix<double, basis_size, basis_size>::Zero();
-//     Eigen::VectorXd rhs_velo = Eigen::VectorXd::Zero(basis_size * Tdim);  
-//     // 1. 构建矩矩阵和右端项（核心逻辑不变）
-//     for (size_t i = 0; i < valid_particle_weights.size(); ++i) {
-//       double weight = valid_particle_weights[i];
-//       if (std::fabs(weight) < 1e-15) continue;  // 新增：过滤极小权重，避免噪声
-//       VectorDim particle_coord = valid_particle_coords[i];
-//       VectorDim particle_velo = valid_particle_velos[i];
-//       // 计算2D线性基：[1, x_i-x, y_i-y]
-//       Eigen::VectorXd basis_at_particle = Eigen::VectorXd::Zero(basis_size);
-//       basis_at_particle(0) = 1.0;  
-//       for (unsigned dim = 0; dim < Tdim; ++dim) {
-//         basis_at_particle(dim + 1) = particle_coord(dim) - point_coord(dim);
-//       }
-//       // 构建矩矩阵 M = Σw_i * Φ_i * Φ_i^T
-//       moment_matrix += weight * basis_at_particle * basis_at_particle.transpose();
-//       // 构建右端项 b = Σw_i * Φ_i * v_i
-//       for (unsigned dim = 0; dim < Tdim; ++dim) {
-//         rhs_velo.segment(dim * basis_size, basis_size) += 
-//             weight * particle_velo(dim) * basis_at_particle;
-//       }
-//     }
-//     // 2. 替换LU分解为QR分解（核心修改）
-//     Eigen::ColPivHouseholderQR<Eigen::Matrix<double, basis_size, basis_size>> qr(moment_matrix);
-//     // 检查矩阵秩（比LU的isInvertible()更鲁棒）
-//     if (qr.rank() < basis_size) {
-//       ctb_console_->warn("MLS moment matrix rank deficient (rank={}), fallback to weighted average", qr.rank());
-//       return this->weighted_average_velo_fallback(valid_particle_velos, valid_particle_weights);
-//     }
-//     // 3. 目标点基函数（不变）
-//     Eigen::VectorXd basis_at_point = Eigen::VectorXd::Zero(basis_size);
-//     basis_at_point(0) = 1.0;
-//     // 目标点自身的线性基项为0，无需循环赋值（等价于你的代码，更简洁）
-//     for (unsigned dim = 0; dim < Tdim; ++dim) {
-//       basis_at_point(dim + 1) = 0.0;
-//     }
-//     // 4. 重构速度（直接解方程，不求逆！）
-//     for (unsigned dim = 0; dim < Tdim; ++dim) {
-//       // 解 M·c = b_dim （替代 c = M^{-1}·b_dim）
-//       Eigen::VectorXd coeffs_velo = qr.solve(rhs_velo.segment(dim * basis_size, basis_size));
-//       interpolated_velo(dim) = basis_at_point.dot(coeffs_velo);
-//     }
-//     ctb_console_->debug("2D Linear MLS: Moment matrix trace={:.4e}, Interpolated velo=[{:.4e}, {:.4e}]",
-//                         moment_matrix.trace(), interpolated_velo(0), interpolated_velo(1));
-//   } catch (std::exception& exception) {
-//     ctb_console_->error("mls_interpolate_velo_at_point failed: {}", exception.what());
-//   }
-//   return interpolated_velo;
-// }
+// MLS-2D QR
+template <unsigned Tdim>
+Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::mls_interpolate_velo_at_point(
+    const VectorDim& point_coord,  
+    const std::vector<VectorDim>& valid_particle_coords,  
+    const std::vector<VectorDim>& valid_particle_velos,  
+    const std::vector<double>& valid_particle_weights) {  
+  VectorDim interpolated_velo = VectorDim::Zero();
+  try {
+    const unsigned basis_size = Tdim + 1;  // 2D=3，3D=4，逻辑不变
+    Eigen::Matrix<double, basis_size, basis_size> moment_matrix = Eigen::Matrix<double, basis_size, basis_size>::Zero();
+    Eigen::VectorXd rhs_velo = Eigen::VectorXd::Zero(basis_size * Tdim);  
+    // 1. 构建矩矩阵和右端项（核心逻辑不变）
+    for (size_t i = 0; i < valid_particle_weights.size(); ++i) {
+      double weight = valid_particle_weights[i];
+      if (std::fabs(weight) < 1e-15) continue;  // 新增：过滤极小权重，避免噪声
+      VectorDim particle_coord = valid_particle_coords[i];
+      VectorDim particle_velo = valid_particle_velos[i];
+      // 计算2D线性基：[1, x_i-x, y_i-y]
+      const double support_radius = 1.5 * this->compute_average_cell_size();
+
+      Eigen::VectorXd basis_at_particle = Eigen::VectorXd::Zero(basis_size);
+      basis_at_particle(0) = 1.0;  
+      for (unsigned dim = 0; dim < Tdim; ++dim) {
+        // basis_at_particle(dim + 1) = particle_coord(dim) - point_coord(dim);
+
+        // 归一化，防止数值问题
+        basis_at_particle(dim + 1) = (particle_coord(dim) - point_coord(dim)) / support_radius;
+      }
+      // 构建矩矩阵 M = Σw_i * Φ_i * Φ_i^T
+      moment_matrix += weight * basis_at_particle * basis_at_particle.transpose();
+      // 构建右端项 b = Σw_i * Φ_i * v_i
+      for (unsigned dim = 0; dim < Tdim; ++dim) {
+        rhs_velo.segment(dim * basis_size, basis_size) += 
+            weight * particle_velo(dim) * basis_at_particle;
+      }
+    }
+    // 2. 替换LU分解为QR分解（核心修改）
+    Eigen::ColPivHouseholderQR<Eigen::Matrix<double, basis_size, basis_size>> qr(moment_matrix);
+    // 检查矩阵秩（比LU的isInvertible()更鲁棒）
+    if (qr.rank() < basis_size) {
+      ctb_console_->warn("MLS moment matrix rank deficient (rank={}), fallback to weighted average", qr.rank());
+      return this->weighted_average_velo_fallback(valid_particle_velos, valid_particle_weights);
+    }
+    // 3. 目标点基函数（不变）
+    Eigen::VectorXd basis_at_point = Eigen::VectorXd::Zero(basis_size);
+    basis_at_point(0) = 1.0;
+    // 目标点自身的线性基项为0，无需循环赋值（等价于你的代码，更简洁）
+    for (unsigned dim = 0; dim < Tdim; ++dim) {
+      basis_at_point(dim + 1) = 0.0;
+    }
+    // 4. 重构速度（直接解方程，不求逆！）
+    for (unsigned dim = 0; dim < Tdim; ++dim) {
+      // 解 M·c = b_dim （替代 c = M^{-1}·b_dim）
+      Eigen::VectorXd coeffs_velo = qr.solve(rhs_velo.segment(dim * basis_size, basis_size));
+      interpolated_velo(dim) = basis_at_point.dot(coeffs_velo);
+    }
+    ctb_console_->debug("2D Linear MLS: Moment matrix trace={:.4e}, Interpolated velo=[{:.4e}, {:.4e}]",
+                        moment_matrix.trace(), interpolated_velo(0), interpolated_velo(1));
+  } catch (std::exception& exception) {
+    ctb_console_->error("mls_interpolate_velo_at_point failed: {}", exception.what());
+  }
+  return interpolated_velo;
+}
 
 
 template <unsigned Tdim>
