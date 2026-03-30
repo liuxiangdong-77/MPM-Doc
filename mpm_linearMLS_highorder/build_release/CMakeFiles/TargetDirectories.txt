@@ -1,5 +1,0 @@
-/home/liuxiangdong/mpm/build_release/CMakeFiles/mpm.dir
-/home/liuxiangdong/mpm/build_release/CMakeFiles/check_git.dir
-/home/liuxiangdong/mpm/build_release/CMakeFiles/git.dir
-/home/liuxiangdong/mpm/build_release/CMakeFiles/edit_cache.dir
-/home/liuxiangdong/mpm/build_release/CMakeFiles/rebuild_cache.dir
