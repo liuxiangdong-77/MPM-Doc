@@ -390,7 +390,7 @@ Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::interpolate_particle_mtf_velo_at
     for (size_t i = 0; i < all_cells.size(); ++i) {
       auto cell = all_cells[i];
       VectorDim xi;
-      if (!found_cell && cell->is_ctbpoint_in_cell(point_coord, &xi)) {
+      if (cell->is_ctbpoint_in_cell(point_coord, &xi)) {
         #pragma omp critical
         {
           if (!found_cell) found_cell = cell;
@@ -771,7 +771,7 @@ mpm::CTBQuantities<Tdim> mpm::Mesh<Tdim>::interpolate_at_point(
     for (size_t i = 0; i < all_cells.size(); ++i) {
       auto cell = all_cells[i];
       VectorDim xi; //cell局部坐标系中的坐标
-      if (!found_cell && cell->is_ctbpoint_in_cell(point_coord, &xi)) {
+      if (cell->is_ctbpoint_in_cell(point_coord, &xi)) {
         #pragma omp critical
         {
           if (!found_cell) {

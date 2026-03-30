@@ -220,11 +220,13 @@ TEST_CASE("Cell is checked for 2D case", "[cell][2D]") {
 
         REQUIRE(cell->point_in_cartesian_cell(point) == true);
         REQUIRE(cell->is_point_in_cell(point, &xi) == true);
+        REQUIRE(cell->is_ctbpoint_in_cell(point, &xi) == true);
 
         // Check point on vertex
         point << 0., 0.;
         REQUIRE(cell->point_in_cartesian_cell(point) == true);
         REQUIRE(cell->is_point_in_cell(point, &xi) == true);
+        REQUIRE(cell->is_ctbpoint_in_cell(point, &xi) == true);
         REQUIRE(xi(0) == Approx(-1. + std::numeric_limits<double>::epsilon())
                              .epsilon(std::numeric_limits<double>::epsilon()));
         REQUIRE(xi(1) == Approx(-1. + std::numeric_limits<double>::epsilon())
@@ -234,6 +236,7 @@ TEST_CASE("Cell is checked for 2D case", "[cell][2D]") {
         point << 0.5, 0.;
         REQUIRE(cell->point_in_cartesian_cell(point) == true);
         REQUIRE(cell->is_point_in_cell(point, &xi) == true);
+        REQUIRE(cell->is_ctbpoint_in_cell(point, &xi) == true);
         REQUIRE(xi(0) ==
                 Approx(-0.5).epsilon(std::numeric_limits<double>::epsilon()));
         REQUIRE(xi(1) == Approx(-1. + std::numeric_limits<double>::epsilon())
@@ -243,6 +246,7 @@ TEST_CASE("Cell is checked for 2D case", "[cell][2D]") {
         point << -2, 2.;
         REQUIRE(cell->point_in_cartesian_cell(point) == false);
         REQUIRE(cell->is_point_in_cell(point, &xi) == false);
+        REQUIRE(cell->is_ctbpoint_in_cell(point, &xi) == false);
       }
 
       // Find local coordinates of a point in a cell
