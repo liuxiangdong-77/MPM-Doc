@@ -384,35 +384,36 @@ Eigen::Matrix<double, Tdim, 1> mpm::Mesh<Tdim>::interpolate_particle_mtf_velo_at
   VectorDim interpolated_velo = VectorDim::Zero();
   try {
     std::shared_ptr<Cell<Tdim>> found_cell = nullptr;
-    auto all_cells = this->cells(); //成功
-    // 1. 定位包含外推点的cell
-    #pragma omp parallel for schedule(runtime)
-    for (size_t i = 0; i < all_cells.size(); ++i) {
-      auto cell = all_cells[i];
-      VectorDim xi;
-      if (!found_cell && cell->is_ctbpoint_in_cell(point_coord, &xi)) {
-        #pragma omp critical
-        {
-          if (!found_cell) found_cell = cell;
+    auto all_cells = this->cells();
+    // 定位包含外推点的cell：使用最近cell中心方法
+    // 当外推点恰好落在背景网格线上时（边界节点沿法向偏移后），
+    // is_point_in_cell会同时返回true给两侧的相邻cell，
+    // 在OMP并行下产生竞争条件，导致选取不确定性甚至空指针崩溃。
+    // "最近cell中心"方法对所有情况（内部点或网格线上的点）均能稳定选出唯一cell。
+    double min_distance = std::numeric_limits<double>::max();
+    #pragma omp parallel
+    {
+      double local_min_distance = std::numeric_limits<double>::max();
+      std::shared_ptr<mpm::Cell<Tdim>> local_nearest_cell = nullptr;
+      #pragma omp for
+      for (size_t i = 0; i < all_cells.size(); ++i) {
+        auto cell = all_cells[i];
+        if (!cell) continue;
+        double distance = (cell->centroid() - point_coord).norm();
+        if (distance < local_min_distance) {
+          local_min_distance = distance;
+          local_nearest_cell = cell;
         }
       }
-    }// 成功！！
-    // 2. Fallback：找最近cell
-    if (!found_cell) {
-      ctb_console_->warn("CTB point [{}, {}] not in any cell, use nearest", point_coord(0), point_coord(1));
-      double min_distance = std::numeric_limits<double>::max();
-      // 核心修改：用 all_cells.for_each() 替代范围for循环
-      all_cells.for_each([&](std::shared_ptr<mpm::Cell<Tdim>> cell) {
-        // 以下业务逻辑完全不变，直接复用
-        if (!cell) return;  // 注意：for_each 中用 return 替代 continue（效果一致）
-        double distance = (cell->centroid() - point_coord).norm();
-        if (distance < min_distance) {
-          min_distance = distance;
-          found_cell = cell;
+      #pragma omp critical
+      {
+        if (local_min_distance < min_distance) {
+          min_distance = local_min_distance;
+          found_cell = local_nearest_cell;
         }
-      }); 
-      if (!found_cell) throw std::runtime_error("No valid cell found for extrapolation point");
+      }
     }
+    if (!found_cell) throw std::runtime_error("No valid cell found for extrapolation point");
     // 3. 获取cell+相邻cell的所有粒子ID
     std::vector<Index> all_particle_ids;
     auto main_particle_ids = found_cell->particles(); // 成功
@@ -760,83 +761,52 @@ mpm::CTBQuantities<Tdim> mpm::Mesh<Tdim>::interpolate_at_point(
 
   try {
     // Step 1: 找到包含外推点的cell
+    // 使用"最近cell中心"方法直接定位：
+    // 当外推点恰好落在背景网格线上时（边界节点沿法向偏移后），
+    // is_point_in_cell会同时返回true给两侧的相邻cell，
+    // 在OMP并行下产生竞争条件，导致选取不确定性甚至空指针崩溃。
+    // "最近cell中心"方法对所有情况均能稳定选出唯一cell，无需额外fallback。
     std::shared_ptr<mpm::Cell<Tdim>> found_cell = nullptr;
-
-    auto all_cells = this->cells();//测试成功
-    
-    // Use the same logic as locate_particle_cells to find the cell
-    // 定位外推点在哪个cell中
-    // 方法1：使用CTB专用检查（处理边界点）
-    #pragma omp parallel for schedule(runtime)
-    for (size_t i = 0; i < all_cells.size(); ++i) {
-      auto cell = all_cells[i];
-      VectorDim xi; //cell局部坐标系中的坐标
-      if (!found_cell && cell->is_ctbpoint_in_cell(point_coord, &xi)) {
-        #pragma omp critical
-        {
-          if (!found_cell) {
-            found_cell = cell;
-          }
-        }
-      }
-    }
-
-    // 方法2: 如果CTB检查也失败，使用最近cell作为fallback
-    if (!found_cell) {
-    ctb_console_->warn("CTB point [{}, {}] not assigned to any cell by rules, using nearest",
-                      point_coord[0], point_coord[1]);
-    
+    auto all_cells = this->cells();
     double min_distance = std::numeric_limits<double>::max();
-    std::shared_ptr<mpm::Cell<Tdim>> nearest_cell = nullptr;
-    
+
     #pragma omp parallel
     {
       double local_min_distance = std::numeric_limits<double>::max();
       std::shared_ptr<mpm::Cell<Tdim>> local_nearest_cell = nullptr;
-      
+
       #pragma omp for
       for (size_t i = 0; i < all_cells.size(); ++i) {
         auto cell = all_cells[i];
         if (!cell) continue;
-        
-        try {
-          double distance = (cell->centroid() - point_coord).norm();
-          if (distance < local_min_distance) {
-            local_min_distance = distance;
-            local_nearest_cell = cell;
-          }
-        } catch (...) {
-          // 忽略错误
+        double distance = (cell->centroid() - point_coord).norm();
+        if (distance < local_min_distance) {
+          local_min_distance = distance;
+          local_nearest_cell = cell;
         }
       }
-      
+
       // 归约操作
       #pragma omp critical
       {
         if (local_min_distance < min_distance) {
           min_distance = local_min_distance;
-          nearest_cell = local_nearest_cell;
+          found_cell = local_nearest_cell;
         }
       }
     }
-    
-    found_cell = nearest_cell;
-    if (found_cell) {
-      ctb_console_->debug("Using nearest cell {} (distance={})", 
-                        found_cell->id(), min_distance);
-    }
-  }
+    if (!found_cell) throw std::runtime_error("No valid cell found for extrapolation point");
+    ctb_console_->debug("Found cell {} for extrapolation point [{}, {}] (distance={})",
+                        found_cell->id(), point_coord[0], point_coord[1], min_distance);
 
     // Step 2: 获取包含外推点的cell及其所有相邻cell中的粒子
+    // found_cell在此处必然非空（由Step 1的nearest-cell-centre方法保证）。
+    // 历史上的崩溃（2025.12.22）正是因为外推点在网格线上导致found_cell为空指针，
+    // 改用最近cell中心方法后该问题已消除。
     std::vector<mpm::Index> all_particle_ids;
     
     // 添加主cell中的粒子
-    auto main_particle_ids = found_cell->particles();//这里出错了2025.12.22 
-    //1. 这里调用cell->particles()
-    //2. 调用vector的拷贝构造函数
-    //3. 在拷贝过程中调用size()函数时崩溃 //2026.1.5
-    //这表示found_cell是空指针（大概率），或cell对象已被销毁但指针还在
-    //核心原因：外推点在网格边线上，不属于任何一个cell
+    auto main_particle_ids = found_cell->particles();
     all_particle_ids.insert(all_particle_ids.end(), 
                            main_particle_ids.begin(), main_particle_ids.end());
     

@@ -386,77 +386,18 @@ template <unsigned Tdim>
 inline bool mpm::Cell<Tdim>::is_ctbpoint_in_cell(
     const Eigen::Matrix<double, Tdim, 1>& point,
     Eigen::Matrix<double, Tdim, 1>* xi) {
-  
+
   // Set an initial value of Xi
   (*xi).fill(std::numeric_limits<double>::max());
-  
-  // CTB-specific tolerance（放大容错率，同时作为“塞进cell内部”的小量偏移）
-  const double ctb_tolerance = 1e-8;  // 微调偏移量，足够小不影响物理结果，足够大脱离边界
-  const double boundary_tolerance = 1e-4;  // 放大容错率，兼容浮点数误差
-  
-  // 1. 先尝试普通校验（严格内部点，直接返回）
-  bool normal_check = this->is_point_in_cell(point, xi);
-  if (normal_check) {
-    return true;  // 外推点已经在cell内部，无需处理
-  }
-  
-  // 2. 近似校验（判断点是否在cell附近，太远直接拒绝）
-  (*xi).fill(std::numeric_limits<double>::max());
-  if (!this->approx_point_in_cell(point)) {
-    return false;  // 外推点离该cell太远，无需处理
-  }
-  
-  // 3. 转换到局部坐标，判断是否在边界附近（外推点的典型场景）
-  Eigen::Matrix<double, Tdim, 1> local_coords;
-  if (!isoparametric_) {
-    local_coords = this->local_coordinates_point(point);
-  } else {
-    local_coords = this->transform_real_to_unit_cell(point);
-  }
-  
-  // 4. 核心修改1：无需强制要求是边界点，允许近边界点（外推点）通过
-  // 移除“非边界点返回false”的判断，保留边界标记仅用于后续微调
-  bool is_boundary_point = false;
-  for (unsigned i = 0; i < Tdim; ++i) {
-    if (std::abs(local_coords(i) + 1.0) < boundary_tolerance ||
-        std::abs(local_coords(i) - 1.0) < boundary_tolerance) {
-      is_boundary_point = true;
-      break;
-    }
-  }
-  
-  // 5. 核心修改2：禁用逻辑错误的CTB特殊规则，直接确认该cell接收外推点
-  // 你的诉求是“把点塞到旁边的cell里”，这里直接让该cell接收，后续微调坐标即可
-  bool accept_cell = true;
-  if (!accept_cell) {
-    return false;
-  }
-  
-  // 6. 核心修改3：不仅微调局部坐标xi，还反向计算“塞进cell内部的全局坐标”
-  // 确保外推点真正脱离边界，进入cell内部（实现你的“小量修正塞进去”的诉求）
-  *xi = local_coords;
-  for (unsigned i = 0; i < Tdim; ++i) {
-    // 左/下边界：微调向右/上，脱离边界
-    if (std::abs((*xi)(i) + 1.0) < boundary_tolerance) {
-      (*xi)(i) = -1.0 + ctb_tolerance;
-    }
-    // 右/上边界：微调向左/下，脱离边界
-    if (std::abs((*xi)(i) - 1.0) < boundary_tolerance) {
-      (*xi)(i) = 1.0 - ctb_tolerance;
-    }
-  }
-  
-  // （可选）反向转换：将微调后的局部坐标转换回全局坐标，更新外推点位置
-  // 若需要后续使用“塞进内部后的外推点”，可添加这一步，确保全局坐标也脱离边界
-  // Eigen::Matrix<double, Tdim, 1> adjusted_global_point;
-  // if (!isoparametric_) {
-  //   adjusted_global_point = this->global_coordinates_point(*xi);
-  // } else {
-  //   adjusted_global_point = this->transform_unit_to_real_cell(*xi);
-  // }
-  
-  // 7. 确认返回：该cell已接收外推点，并将其“塞进”内部
-  return true;
+
+  // Delegate to the standard is_point_in_cell check.
+  // Note: for extrapolation points that land exactly on a shared grid line
+  // (boundary between two adjacent cells), is_point_in_cell returns true for
+  // BOTH neighbouring cells simultaneously, so callers must NOT use this
+  // function alone to locate the cell. Use the nearest-cell-centre approach
+  // (minimum distance from cell centroid) as the primary strategy when the
+  // point is known to be on a mesh line.
+  return this->is_point_in_cell(point, xi);
 }
 
 //! Return the local coordinates of a point in a 1D cell
