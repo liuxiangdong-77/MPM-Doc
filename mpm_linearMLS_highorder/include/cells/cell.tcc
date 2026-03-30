@@ -398,8 +398,8 @@ inline bool mpm::Cell<Tdim>::is_ctbpoint_in_cell(
   if (!this->approx_point_in_cell(point)) return false;
 
   // CTB tolerance to treat points on mesh lines robustly
-  const double ctb_tolerance = 1.e-8;
-  const double boundary_tolerance = 1.e-6;
+  const double ctb_inset_tolerance = 1.e-8;
+  const double ctb_boundary_expansion = 1.e-6;
 
   // Transform to local coordinates and check expanded bounds
   Eigen::Matrix<double, Tdim, 1> local_coords;
@@ -415,32 +415,34 @@ inline bool mpm::Cell<Tdim>::is_ctbpoint_in_cell(
   if ((Tdim == 2 && this->element_->corner_indices().size() == 3) ||
       (Tdim == 3 && this->element_->corner_indices().size() == 4)) {
     // Triangle / tetrahedron in [0, 1]
-    if (local_coords.sum() > 1. + boundary_tolerance) status = false;
+    if (local_coords.sum() > 1. + ctb_boundary_expansion) return false;
     for (unsigned i = 0; i < local_coords.size(); ++i) {
-      if (local_coords(i) < -boundary_tolerance ||
-          local_coords(i) > 1. + boundary_tolerance) {
+      if (local_coords(i) < -ctb_boundary_expansion ||
+          local_coords(i) > 1. + ctb_boundary_expansion) {
         status = false;
+        break;
       }
     }
     if (!status) return false;
     *xi = local_coords;
     for (unsigned i = 0; i < (*xi).size(); ++i) {
-      if ((*xi)(i) < ctb_tolerance) (*xi)(i) = ctb_tolerance;
-      if ((*xi)(i) > 1. - ctb_tolerance) (*xi)(i) = 1. - ctb_tolerance;
+      if ((*xi)(i) < ctb_inset_tolerance) (*xi)(i) = ctb_inset_tolerance;
+      if ((*xi)(i) > 1. - ctb_inset_tolerance) (*xi)(i) = 1. - ctb_inset_tolerance;
     }
   } else {
     // Quad / hexahedron in [-1, 1]
     for (unsigned i = 0; i < local_coords.size(); ++i) {
-      if (local_coords(i) < -1. - boundary_tolerance ||
-          local_coords(i) > 1. + boundary_tolerance) {
+      if (local_coords(i) < -1. - ctb_boundary_expansion ||
+          local_coords(i) > 1. + ctb_boundary_expansion) {
         status = false;
+        break;
       }
     }
     if (!status) return false;
     *xi = local_coords;
     for (unsigned i = 0; i < (*xi).size(); ++i) {
-      if ((*xi)(i) < -1. + ctb_tolerance) (*xi)(i) = -1. + ctb_tolerance;
-      if ((*xi)(i) > 1. - ctb_tolerance) (*xi)(i) = 1. - ctb_tolerance;
+      if ((*xi)(i) < -1. + ctb_inset_tolerance) (*xi)(i) = -1. + ctb_inset_tolerance;
+      if ((*xi)(i) > 1. - ctb_inset_tolerance) (*xi)(i) = 1. - ctb_inset_tolerance;
     }
   }
 
