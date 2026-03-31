@@ -716,7 +716,7 @@ class Mesh {
   bool apply_ctb_to_node(
       const std::shared_ptr<mpm::NodeBase<Tdim>>& node,
       unsigned phase, double dt, mpm::Edge_Position boundary_position,
-      unsigned dir, unsigned int order);
+      unsigned int order);
 
   VectorDim compute_mtf_velocity_single_wave(
         const std::shared_ptr<NodeBase<Tdim>>& node,

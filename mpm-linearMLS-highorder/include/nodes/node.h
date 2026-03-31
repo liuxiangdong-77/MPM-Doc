@@ -278,9 +278,6 @@ class Node : public NodeBase<Tdim> {
                                   double a, double b,
                                   mpm::Position position) override;
 
-  bool apply_spring_constraint(unsigned dir, double delta, double h_min,
-                               mpm::Position position) override;
-
 /*=======================================CTB======================================================*/
 
   VectorDim compute_boundary_normal(mpm::Edge_Position boundary_position) const override;

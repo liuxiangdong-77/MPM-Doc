@@ -278,9 +278,6 @@ class NodeBase {
                                           double h_min, double a, double b,
                                           mpm::Position position) = 0;
 
-  virtual bool apply_spring_constraint(unsigned dir, double delta, double h_min,
-                               mpm::Position position) = 0;
-
 
 /*====================================================CTB================================================*/
 
