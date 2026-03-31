@@ -76,9 +76,8 @@ void mpm::Mesh<Tdim>::apply_ctb_constraints(unsigned phase, double dt) {
       // 获取该节点集的所有节点
       auto& nodes_in_set = (set_id == -1) ? nodes_ : node_sets_.at(set_id);//成功
       
-      ctb_console_->debug("Applying CTB to nset {}: {} nodes, dir={}, pos={}, order={}",
+      ctb_console_->debug("Applying CTB to nset {}: {} nodes, pos={}, order={}",
                          set_id, nodes_in_set.size(),
-                         ctb_constraint->dir(),
                          static_cast<int>(ctb_constraint->position()),
                          ctb_constraint->order());//测试成功（Applying CTB to nset 0: 1 nodes, dir=0, pos=10, order=3）
       
@@ -88,7 +87,6 @@ void mpm::Mesh<Tdim>::apply_ctb_constraints(unsigned phase, double dt) {
         bool status = this->apply_ctb_to_node(
             node, phase, dt,
             ctb_constraint->position(),
-            ctb_constraint->dir(),
             ctb_constraint->order()
         );
         
@@ -111,7 +109,7 @@ template <unsigned Tdim>
 bool mpm::Mesh<Tdim>::apply_ctb_to_node(
     const std::shared_ptr<mpm::NodeBase<Tdim>>& node,
     unsigned phase, double dt, mpm::Edge_Position boundary_position,
-    unsigned dir, unsigned int order) {
+    unsigned int order) {
   
   bool status = false;
   try {
@@ -134,9 +132,6 @@ bool mpm::Mesh<Tdim>::apply_ctb_to_node(
     // Only apply to boundary nodes with specific positions
     if (boundary_position == mpm::Edge_Position::None) {
       return true; // Not a boundary node, skip CTB
-    }
-    if (dir >= Tdim){
-      throw std::runtime_error("Direction is out of bounds");
     }
     ctb_console_->debug("Node{}: Applying CTB constraint at {} with n={} order",
                     node->id(), 

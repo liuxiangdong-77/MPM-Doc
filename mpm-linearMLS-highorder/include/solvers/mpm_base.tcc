@@ -1412,40 +1412,23 @@ void mpm::MPMBase<Tdim>::nodal_ctb_constraints(
       //range-based for 循环，const auto& constraints是循环变量，代表容器中的每个元素，mesh_props是要遍历的容器
         // Set id
         int nset_id = constraints.at("nset_id").template get<int>();
-        // Direction //compression wave (P波) 传播的方向
-        unsigned dir = constraints.at("dir").template get<unsigned>();
         // N //透射次数，透射N次表示有N阶精度
         unsigned int order = constraints.at("order").template get<unsigned int>();
-        // Delta
-        double delta = constraints.at("delta").template get<double>();
-        // h_min
-        double h_min = constraints.at("h_min").template get<double>();
 
         // position
         std::string position_str =
             constraints.at("Edge_position").template get<std::string>();
         mpm::Edge_Position position = string_to_edge_position(position_str);
 
-        // position_simple_
-        std::string position_str_simple =
-            constraints.at("position_simple").template get<std::string>();
-        mpm::Position position_simple = mpm::Position::None;
-        if (position_str_simple == "corner")
-          position_simple = mpm::Position::Corner;
-        else if (position_str_simple == "edge")
-          position_simple = mpm::Position::Edge;
-        else if (position_str_simple == "face")
-          position_simple = mpm::Position::Face;
 
 
-
-        console_->debug("Reading CTB constraint: nset_id: {}, dir: {}, order: {}, "
+        console_->debug("Reading CTB constraint: nset_id: {}, order: {}, "
                         "position: {}",
-                       nset_id, dir, order, position_str);
+                       nset_id, order, position_str);
         
         // Add ctb constraint to mesh
         auto ctb_constraint = std::make_shared<mpm::CTBConstraint>(
-            nset_id, dir, order, delta, h_min, position, position_simple); //创建std::shared_ptr智能指针，管理动态分配的对象
+            nset_id, order, position); //创建std::shared_ptr智能指针，管理动态分配的对象
 
         // bool ctb_constraints =
         //     constraints_->assign_nodal_ctb_constraint(nset_id, ctb_constraint, phase, dt); //初始化时候不应该用这个函数

@@ -148,7 +148,7 @@ class Constraints {
 
   //! Assign ctb constraints to nodes
   bool assign_nodal_ctb_constraints(
-      const std::vector<std::tuple<mpm::Index, unsigned, mpm::Edge_Position,
+      const std::vector<std::tuple<mpm::Index, mpm::Edge_Position,
                                    unsigned>>& ctb_constraints, unsigned phase, double dt);
 
   //! Assign ctb constraints pointers and ids
