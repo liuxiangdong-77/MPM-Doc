@@ -170,6 +170,10 @@ bool mpm::Mesh<Tdim>::apply_ctb_to_node(
       // 关键3：按法向轴一致性组合角点结果（避免简单平均导致过反射）
       VectorDim total_mtf_velocity = VectorDim::Zero();
       VectorDim fallback_sum = VectorDim::Zero();
+      std::array<double, Tdim> axis_sum{};
+      axis_sum.fill(0.0);
+      std::array<unsigned, Tdim> axis_count{};
+      axis_count.fill(0);
       std::array<bool, Tdim> axis_assigned{};
       axis_assigned.fill(false);
       for (const auto& single_normal : single_normals) {
@@ -199,14 +203,20 @@ bool mpm::Mesh<Tdim>::apply_ctb_to_node(
             primary_axis = d;
           }
         }
-        total_mtf_velocity(primary_axis) = combined(primary_axis);
+        axis_sum[primary_axis] += combined(primary_axis);
+        axis_count[primary_axis] += 1;
         axis_assigned[primary_axis] = true;
       }
 
       // 角点兜底：若某轴未被对应法向赋值，退回累加结果该分量
       if (single_normals.size() > 1) {
         for (unsigned d = 0; d < Tdim; ++d) {
-          if (!axis_assigned[d]) total_mtf_velocity(d) = fallback_sum(d);
+          if (axis_assigned[d] && axis_count[d] > 0) {
+            total_mtf_velocity(d) = axis_sum[d] / static_cast<double>(axis_count[d]);
+          } else {
+            total_mtf_velocity(d) =
+                fallback_sum(d) / static_cast<double>(single_normals.size());
+          }
         }
       }
 
