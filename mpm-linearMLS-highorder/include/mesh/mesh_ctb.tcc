@@ -167,8 +167,11 @@ bool mpm::Mesh<Tdim>::apply_ctb_to_node(
         return true;
       }
 
-      // 关键3：累加所有单一法向量对应的4套外推点结果（2个法向量×2套/法向量）
+      // 关键3：按法向轴一致性组合角点结果（避免简单平均导致过反射）
       VectorDim total_mtf_velocity = VectorDim::Zero();
+      VectorDim fallback_sum = VectorDim::Zero();
+      std::array<bool, Tdim> axis_assigned{};
+      axis_assigned.fill(false);
       for (const auto& single_normal : single_normals) {
         // 每套单一法向量对应2套外推点：
         // 1. P波（cp）沿该法向外推 → 直接求解该法向对应的法向速度
@@ -179,12 +182,32 @@ bool mpm::Mesh<Tdim>::apply_ctb_to_node(
         VectorDim velocity_s = compute_mtf_velocity_single_wave(
             node, phase, dt, single_normal, cs, order, false);
 
-        // 累加该法向量对应的P/S波速度
-        total_mtf_velocity += velocity_s + velocity_p;
+        VectorDim combined = velocity_s + velocity_p;
+        fallback_sum += combined;
+        if (single_normals.size() == 1) {
+          total_mtf_velocity += combined;
+          continue;
+        }
+
+        // 角点：仅将该单一法向主轴分量写入，避免不同法向在同一分量上直接平均
+        unsigned primary_axis = 0;
+        double max_abs = 0.0;
+        for (unsigned d = 0; d < Tdim; ++d) {
+          const double abs_val = std::abs(single_normal(d));
+          if (abs_val > max_abs) {
+            max_abs = abs_val;
+            primary_axis = d;
+          }
+        }
+        total_mtf_velocity(primary_axis) = combined(primary_axis);
+        axis_assigned[primary_axis] = true;
       }
 
-      if(single_normals.size() > 1){
-        total_mtf_velocity *= 0.5;
+      // 角点兜底：若某轴未被对应法向赋值，退回累加结果该分量
+      if (single_normals.size() > 1) {
+        for (unsigned d = 0; d < Tdim; ++d) {
+          if (!axis_assigned[d]) total_mtf_velocity(d) = fallback_sum(d);
+        }
       }
 
       // 关键4改：更新结点MTF速度
@@ -1084,8 +1107,13 @@ void mpm::Mesh<Tdim>::get_particle_quantities(
       return;
     }
 
-    // 检查历史步是否在有效范围内
-    unsigned max_history_steps = 3; // 假设最多存储3个历史步
+    // 检查历史步是否在有效范围内（与材料真实history_size一致）
+    unsigned max_history_steps = 0;
+    auto material_ptr = particle->material(phase);
+    if (material_ptr != nullptr && material_ptr->supports_ctb_history()) {
+      const unsigned hsize = material_ptr->history_size();
+      max_history_steps = (hsize > 0) ? (hsize - 1) : 0;
+    }
     if (history_step > max_history_steps) {
       ctb_console_->warn("Particle {}: history_step {} exceeds max {}", 
                         particle->id(), history_step, max_history_steps);

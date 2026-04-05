@@ -87,89 +87,36 @@ void mpm::LinearElasticCTB<Tdim>::advance_history_variables(
     //   current_density = 2000.0; // 使用默认密度
     // }
     
-    // ================= 核心逻辑 =================
-    // 在前 N-1 个时间步，将所有历史时间步都设置为当前值
-    // 这里假设 history_size_ = MTF阶数
-    if (time_step < history_size_ - 1) {
-      console_->debug("Step {} < {}: Initialising all history with current values",
-                     time_step, history_size_ - 1);
-      
-      // 将所有历史时间步都设置为当前值
-      for (unsigned t = 0; t < history_size_; ++t) {
-        // // 密度
-        // (*state_vars)["density_t" + std::to_string(t)] = current_density;
-        
-        // 速度
-        for (unsigned i = 0; i < Tdim; ++i) {
-          double vel_component = current_velocity(i);
-          if (std::isnan(vel_component)) vel_component = 0.0;
-          (*state_vars)["velocity_" + std::to_string(i) + "_t" + std::to_string(t)] = 
-              vel_component;
-        }
-        
-        // // 应力
-        // for (unsigned i = 0; i < 6; ++i) {
-        //   double stress_component = current_stress(i);
-        //   if (std::isnan(stress_component)) stress_component = 0.0;
-        //   (*state_vars)["stress_" + std::to_string(i) + "_t" + std::to_string(t)] = 
-        //       stress_component;
-        // }
-      }
-    } else {
-      // 正常模式：从第 N-1 步开始正常的历史移动
-      console_->debug("Step {} >= {}: Normal history advancement",
-                     time_step, history_size_ - 1);
-      
-      // 移动历史：t_last → t_last-1 → ... → t1
-      for (unsigned t = history_size_ - 1; t > 0; --t) {
-        // // 移动密度历史
-        // std::string current_key = "density_t" + std::to_string(t);
-        // std::string previous_key = "density_t" + std::to_string(t - 1);
-        // auto prev_it = state_vars->find(previous_key);
-        // if (prev_it != state_vars->end()) {
-        //   (*state_vars)[current_key] = prev_it->second;
-        // } else {
-        //   console_->warn("Previous history not found: {}, using current value", 
-        //                 previous_key);
-        //   (*state_vars)[current_key] = current_density;
-        // }
-        
-        // 移动速度历史
-        for (unsigned i = 0; i < Tdim; ++i) {
-          std::string current_key = "velocity_" + std::to_string(i) + "_t" + std::to_string(t);
-          std::string previous_key = "velocity_" + std::to_string(i) + "_t" + std::to_string(t - 1);
-          
-          auto prev_it = state_vars->find(previous_key);
-          if (prev_it != state_vars->end()) {
-            (*state_vars)[current_key] = prev_it->second;
-          } else {
-            (*state_vars)[current_key] = current_velocity(i);
-          }
-        }
-        
-        // // 移动应力历史
-        // for (unsigned i = 0; i < 6; ++i) {
-        //   current_key = "stress_" + std::to_string(i) + "_t" + std::to_string(t);
-        //   previous_key = "stress_" + std::to_string(i) + "_t" + std::to_string(t - 1);
-        //   prev_it = state_vars->find(previous_key);
-        //   if (prev_it != state_vars->end()) {
-        //     (*state_vars)[current_key] = prev_it->second;
-        //   } else {
-        //     (*state_vars)[current_key] = current_stress(i);
-        //   }
-        // }
-      }
-      
-      // // 存储当前值到 t0
-      // (*state_vars)["density_t0"] = current_density;
-      
+    // 统一时序推进：每步先右移历史，再写入当前到 t0
+    for (unsigned t = history_size_ - 1; t > 0; --t) {
       for (unsigned i = 0; i < Tdim; ++i) {
-        (*state_vars)["velocity_" + std::to_string(i) + "_t0"] = current_velocity(i);
+        std::string current_key =
+            "velocity_" + std::to_string(i) + "_t" + std::to_string(t);
+        std::string previous_key =
+            "velocity_" + std::to_string(i) + "_t" + std::to_string(t - 1);
+
+        auto prev_it = state_vars->find(previous_key);
+        if (prev_it != state_vars->end()) {
+          (*state_vars)[current_key] = prev_it->second;
+        } else {
+          (*state_vars)[current_key] = current_velocity(i);
+        }
       }
-      
-      // for (unsigned i = 0; i < 6; ++i) {
-      //   (*state_vars)["stress_" + std::to_string(i) + "_t0"] = current_stress(i);
-      // }
+    }
+
+    // 平滑启动：在历史未填满阶段，把未初始化段补成当前值（避免启动尖峰）
+    if (time_step < history_size_ - 1) {
+      const unsigned max_valid_history = static_cast<unsigned>(time_step + 1);
+      for (unsigned t = max_valid_history; t < history_size_; ++t) {
+        for (unsigned i = 0; i < Tdim; ++i) {
+          (*state_vars)["velocity_" + std::to_string(i) + "_t" +
+                        std::to_string(t)] = current_velocity(i);
+        }
+      }
+    }
+
+    for (unsigned i = 0; i < Tdim; ++i) {
+      (*state_vars)["velocity_" + std::to_string(i) + "_t0"] = current_velocity(i);
     }
     
     // ============= 调试输出 =============

@@ -179,6 +179,9 @@ class Material {
 
   //! Check if material supports CTB history lxd
   virtual bool supports_ctb_history() const { return false; }
+
+  //! Number of stored CTB history steps (default: current only)
+  virtual unsigned history_size() const { return 1; }
   
   //! Get history variable (for CTB)
   virtual double get_history_variable(const mpm::dense_map* state_vars,
